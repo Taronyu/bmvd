@@ -55,11 +55,14 @@ def main():
 					help="device name to use")
 	ap.add_argument("-s", "--single", action="store_true",
 					help="read only one data block and exit")
-
+	ap.add_argument("-f", "--file", dest="open_file", action="store_true",
+					help="read a data file and exit")
 	args = ap.parse_args()
 
 	bp = BlockParser()
-	load_data_file(args.device, bp)
+
+	if args.open_file:
+		load_data_file(args.device, bp)
 
 if __name__ == "__main__":
 	main()
