@@ -1,53 +1,73 @@
 import argparse
 
-def load_data_file(filePath: str, parser):
+def print_block(block):
+	for line in block:
+		print(line)
+	print()
+
+def load_data_file(filePath: str, parser, bufsize=1024):
+	counter = 0
 	with open(filePath, "rb") as fin:
 		while True:
-			line = fin.readline()
-			if line:
-				parser.append_line(line)
+			data = fin.read(bufsize)
+			if data:
+				for b in parser.process(data):
+					print_block(b)
 			else:
 				break
 
-class BlockParser:
+class StreamParser:
 	_CHECKSUM_LABEL = b"Checksum"
 
 	def __init__(self):
-		self._lines = []
-		self._block_count = 0
+		self._buffer = bytearray()
 
-	def append_line(self, line: bytes):
-		if not line:
-			return
+	def process(self, data: bytes):
+		if not data:
+			return None
 
-		line = line.strip()
-		if not line:
-			return
+		result = []
+		self._buffer.extend(data)
+		while True:
+			block = self._extract_block()
+			if block:
+				result.append(block)
+			else:
+				self._check_discard_buffer()
+				break
 
-		self._lines.append(line)
-
-		if line.startswith(BlockParser._CHECKSUM_LABEL):
-			self._extract_block()
+		return result
 
 	def _extract_block(self):
-		if self._is_checksum_ok():
-			self._lines.pop() # remove checksum block
-			for line in self._lines:
-				text = line.decode("ascii", "replace")
-				print(text.upper())
-			print()
+		# Find the checksum label
+		pos = self._buffer.find(StreamParser._CHECKSUM_LABEL)
+		if pos == -1:
+			return None
 
-			self._block_count += 1
+		# Total block length
+		# Checksum label length: len(label) + 1 tab + 1 byte
+		blocklen = pos + len(StreamParser._CHECKSUM_LABEL) + 2
+		if len(self._buffer) < blocklen:
+			return None
 
-		self._lines.clear()
+		# Remove the block memory
+		blockbuf = self._buffer[:blocklen]
+		del self._buffer[:blocklen]
 
-	def _is_checksum_ok(self) -> bool:
-		_sum = 0
-		for line in self._lines:
-			# include stripped \r\n in the calculation
-			_sum = _sum + 0x0d + 0x0a + sum(line)
+		# Validate the block (checksum)
+		if sum(blockbuf) % 256 != 0:
+			return None
 
-		return _sum % 256 == 0
+		# Remove the checksum block
+		del blockbuf[pos:blocklen]
+
+		# Split the lines
+		lines = blockbuf.splitlines()
+		return [l.decode("ascii", "replace") for l in lines if l]
+
+	def _check_discard_buffer(self, maxsize=1024):
+		if len(self._buffer) >= maxsize:
+			del self._buffer[:maxsize]
 
 def main():
 	ap = argparse.ArgumentParser(prog="bmv600s", description="Read Victron BMV-600s serial data")
@@ -59,10 +79,10 @@ def main():
 					help="read a data file and exit")
 	args = ap.parse_args()
 
-	bp = BlockParser()
+	sp = StreamParser()
 
 	if args.open_file:
-		load_data_file(args.device, bp)
+		load_data_file(args.device, sp)
 
 if __name__ == "__main__":
 	main()
