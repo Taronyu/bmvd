@@ -1,9 +1,9 @@
 import argparse
+import serial
 
-def print_block(block):
-	for line in block:
-		print(line)
-	print()
+def print_block(block: dict):
+	for k, v in block.items():
+		print("'{0}'={1}".format(k, v))
 
 def load_data_file(filePath: str, parser, bufsize=1024):
 	counter = 0
@@ -13,6 +13,26 @@ def load_data_file(filePath: str, parser, bufsize=1024):
 			if data:
 				for b in parser.process(data):
 					print_block(b)
+			else:
+				break
+
+def read_serial(device: str, parser, bufsize=1024, stopcount=0):
+	counter = 0
+	with serial.Serial(device, 19200, timeout=5, xonxoff=True) as ser:
+		while True:
+			raw = ser.read(bufsize)
+			if raw:
+				blocks = parser.process(raw)
+				if blocks:
+					counter += len(blocks)
+					for b in blocks:
+						print_block(b)
+
+				if stopcount > 0:
+					if counter >= stopcount:
+						break
+				else:
+					counter = 0
 			else:
 				break
 
@@ -62,12 +82,23 @@ class StreamParser:
 		del blockbuf[pos:blocklen]
 
 		# Split the lines
+		block = dict()
 		lines = blockbuf.splitlines()
-		return [l.decode("ascii", "replace") for l in lines if l]
+		for line in lines:
+			text = line.decode("ascii", "replace")
+			if text:
+				StreamParser._parse_line(text, block)
+
+		return block
 
 	def _check_discard_buffer(self, maxsize=1024):
 		if len(self._buffer) >= maxsize:
 			del self._buffer[:maxsize]
+
+	def _parse_line(line: str, block: dict):
+		values = line.split('\t')
+		if len(values) == 2:
+			block[values[0]] = values[1]
 
 def main():
 	ap = argparse.ArgumentParser(prog="bmv600s", description="Read Victron BMV-600s serial data")
@@ -83,6 +114,12 @@ def main():
 
 	if args.open_file:
 		load_data_file(args.device, sp)
+	else:
+		if args.single:
+			stopcount = 2
+		else:
+			stopcount = 0
+		read_serial(args.device, sp, 64, stopcount)
 
 if __name__ == "__main__":
 	main()
