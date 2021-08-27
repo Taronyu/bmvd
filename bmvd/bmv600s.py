@@ -5,13 +5,30 @@ except ModuleNotFoundError:
 	_HAS_SERIAL = False
 
 import argparse
+from contextlib import contextmanager
 
 def has_serial_support() -> bool:
 	return _HAS_SERIAL
 
-class SerialReader:
-	def __init__(self, device: str):
-		self._device = device
+@contextmanager
+def open_serial_port(device: str):
+	"""Opens the specified serial port for reading with the correct settings for the Victron BMV-600S battery monitor.
+
+	Parameters:
+		device: The serial port device path
+
+	Returns:
+		(sp, err): Serial port handle and error if opening the port failed
+	"""
+	try:
+		sp = serial.Serial(device, 19200, timeout=5, xonxoff=True)
+	except serial.SerialException as e:
+		yield None, e
+	else:
+		try:
+			yield sp, None
+		finally:
+			sp.close()
 
 class BlockReader:
 	_CHECKSUM_LABEL = b"Checksum"
