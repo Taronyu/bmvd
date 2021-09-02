@@ -1,3 +1,4 @@
+import argparse
 from flask import Flask, json
 
 api = Flask(__name__)
@@ -12,9 +13,13 @@ def get_bmv600s_status():
     return json.dumps(data)
 
 
-def run(host="0.0.0.0", port=7070):
-    api.run(host=host, port=port)
+def main():
+    ap = argparse.ArgumentParser(description="Battery monitor http server")
+    ap.add_argument("-p", "--port", metavar="PORT", type=int, default=7070,
+                    help="server port to listen on")
+    args = ap.parse_args()
+    api.run(host="0.0.0.0", port=args.port)
 
 
 if __name__ == "__main__":
-    run()
+    main()
