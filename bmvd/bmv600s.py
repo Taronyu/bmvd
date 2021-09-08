@@ -15,48 +15,108 @@ class AlarmReason(IntFlag):
     low_state_of_charge = 4
 
 
-def _str_to_bool(value: str) -> bool:
-    if str == "On":
-        return True
-    else:
-        return False
+class DataField:
+    "This class defines metadata for a BMV data field."
+
+    def __init__(self, name: str, description: str):
+        """Constructs a new class instance.
+
+        Parameters:
+            name: Parameter name
+            description: Optional parameter description
+        """
+        self.name = name
+        self.description = description
 
 
-_FIELD_NAMES = dict()
-_FIELD_NAMES["V"] = ("voltage", int, "Voltage (mV)")
-_FIELD_NAMES["I"] = ("current", int, "Current (mA)")
-_FIELD_NAMES["CE"] = ("consumed_energy", int, "Consumed energy (mAh)")
-_FIELD_NAMES["SOC"] = ("state_of_charge", int, "State of charge (promille)")
-_FIELD_NAMES["TTG"] = ("time_to_go", int, "Time to go (min)")
-_FIELD_NAMES["Alarm"] = ("alarm", _str_to_bool, "Alarm active")
-_FIELD_NAMES["Relay"] = ("relay", _str_to_bool, "Relay active")
-_FIELD_NAMES["AR"] = ("alarm_reason", int, "Alarm reason")
-_FIELD_NAMES["BMV"] = ("bmv_model", str, "BMV model")
-_FIELD_NAMES["FW"] = ("fw_version", str, "BMV firmware version")
-_FIELD_NAMES["H1"] = ("deepest_discharge", int, "Deepest discharge (mAh)")
-_FIELD_NAMES["H2"] = ("last_discharge", int, "Last discharge (mAh)")
-_FIELD_NAMES["H3"] = ("average_discharge", int, "Average discharge (mAh)")
-_FIELD_NAMES["H4"] = ("num_charge_cycles", int, "Number of charge cycles")
-_FIELD_NAMES["H5"] = ("num_full_discharges", int, "Number of full discharges")
-_FIELD_NAMES["H6"] = ("total_consumed", int, "Total consumed energy (mAh)")
-_FIELD_NAMES["H7"] = ("min_battery_voltage", int,
-                      "Minimum battery voltage (mV)")
-_FIELD_NAMES["H8"] = ("max_battery_voltage", int,
-                      "Maximum battery voltage (mV)")
-_FIELD_NAMES["H9"] = ("days_since_last_full_charge", int,
-                      "Number of days since last full charge")
-_FIELD_NAMES["H10"] = ("num_auto_syncs", int,
-                       "Number of automatic synchronizations")
-_FIELD_NAMES["H11"] = ("num_low_voltage_alarms", int,
-                       "Number of low voltage alarms", int)
-_FIELD_NAMES["H12"] = ("num_high_voltage_alarms", int,
-                       "Number of high voltage alarms")
+class IntDataField(DataField):
+    "This class provides metadata for an integer field."
+
+    def convert(self, value: str) -> int:
+        if value:
+            return int(value)
+        else:
+            return 0
+
+
+class BoolDataField(DataField):
+    "This class provides metadata for a boolean field."
+
+    def convert(self, value: str) -> bool:
+        return True if value == "On" else False
+
+
+class StringDataField(DataField):
+    "This class provides metadata for a string field."
+
+    def convert(self, value: str) -> str:
+        return value
+
+
+class AlarmReasonDataField(DataField):
+    "This class provides metadata for a alarm reason field."
+
+    def convert(self, value: str) -> str:
+        if not value:
+            return "None"
+
+        int_value = int(value)
+        if int_value == 0:
+            return "None"
+
+        result = str()
+
+        for alarm in AlarmReason:
+            if int_value & alarm:
+                if result:
+                    result += ", " + str(alarm)
+                else:
+                    result = str(alarm)
+
+        return result
+
+
+DATA_FIELDS = dict()
+DATA_FIELDS["V"] = IntDataField("voltage", "Voltage (mV)")
+DATA_FIELDS["I"] = IntDataField("current", "Current (mA)")
+DATA_FIELDS["CE"] = IntDataField("consumed_energy", "Consumed energy (mAh)")
+DATA_FIELDS["SOC"] = IntDataField(
+    "state_of_charge", "State of charge (promille)")
+DATA_FIELDS["TTG"] = IntDataField("time_to_go", "Time to go (min)")
+DATA_FIELDS["Alarm"] = BoolDataField("alarm", "Alarm active")
+DATA_FIELDS["Relay"] = BoolDataField("relay", "Relay active")
+DATA_FIELDS["AR"] = AlarmReasonDataField("alarm_reason", "Alarm reason")
+DATA_FIELDS["BMV"] = StringDataField("bmv_model", "BMV model")
+DATA_FIELDS["FW"] = StringDataField("fw_version", "BMV firmware version")
+DATA_FIELDS["H1"] = IntDataField(
+    "deepest_discharge", "Deepest discharge (mAh)")
+DATA_FIELDS["H2"] = IntDataField("last_discharge", "Last discharge (mAh)")
+DATA_FIELDS["H3"] = IntDataField(
+    "average_discharge", "Average discharge (mAh)")
+DATA_FIELDS["H4"] = IntDataField(
+    "num_charge_cycles", "Number of charge cycles")
+DATA_FIELDS["H5"] = IntDataField(
+    "num_full_discharges", "Number of full discharges")
+DATA_FIELDS["H6"] = IntDataField(
+    "total_consumed", "Total consumed energy (mAh)")
+DATA_FIELDS["H7"] = IntDataField("min_battery_voltage",
+                                 "Minimum battery voltage (mV)")
+DATA_FIELDS["H8"] = IntDataField("max_battery_voltage",
+                                 "Maximum battery voltage (mV)")
+DATA_FIELDS["H9"] = IntDataField("days_since_last_full_charge",
+                                 "Number of days since last full charge")
+DATA_FIELDS["H10"] = IntDataField("num_auto_syncs",
+                                  "Number of automatic synchronizations")
+DATA_FIELDS["H11"] = IntDataField("num_low_voltage_alarms",
+                                  "Number of low voltage alarms")
+DATA_FIELDS["H12"] = IntDataField("num_high_voltage_alarms",
+                                  "Number of high voltage alarms")
 
 
 def _get_field_value(name: str, value: str) -> tuple:
-    meta = _FIELD_NAMES.get(name)
-    if meta:
-        return (meta[0], meta[1](value))
+    field = DATA_FIELDS.get(name)
+    if field:
+        return (field.name, field.convert(value))
     else:
         return (name, value)
 
