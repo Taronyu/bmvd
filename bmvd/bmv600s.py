@@ -60,20 +60,16 @@ class AlarmReasonDataField(DataField):
         if not value:
             return "None"
 
-        int_value = int(value)
-        if int_value == 0:
+        value = int(value)
+        if value == 0:
             return "None"
 
-        result = str()
-
+        alarms = []
         for alarm in AlarmReason:
-            if int_value & alarm:
-                if result:
-                    result += ", " + str(alarm)
-                else:
-                    result = str(alarm)
+            if value & alarm:
+                alarms.append(str(alarm))
 
-        return result
+        return "|".join(alarms)
 
 
 DATA_FIELDS = dict()
