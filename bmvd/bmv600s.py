@@ -7,8 +7,7 @@ except ModuleNotFoundError:
 import argparse
 from contextlib import contextmanager
 from enum import IntFlag
-from dataclasses import InitVar, dataclass, field
-from typing import Type
+from typing import Any, Callable
 
 
 class AlarmReason(IntFlag):
@@ -17,121 +16,68 @@ class AlarmReason(IntFlag):
     low_state_of_charge = 4
 
 
-@dataclass
-class MonitorData:
-    source_name: str
-    display_name: str
-    description: str
+def _as_int(value: str) -> int:
+    return int(value) if value else 0
 
 
-@dataclass
-class IntMonitorData(MonitorData):
-    value: int = field(init=False)
-    raw_value: InitVar[str]
-
-    def __post_init__(self, raw_value: str) -> None:
-        self.value = int(raw_value) if raw_value else 0
+def _as_bool(value: str) -> bool:
+    return value == "On"
 
 
-@dataclass
-class BoolMonitorData(MonitorData):
-    value: bool = field(init=False)
-    raw_value: InitVar[str]
+def _as_alarm_str(value: str) -> str:
+    if value:
+        value = int(value)
+        alarms = [str(alarm) for alarm in AlarmReason if value & alarm]
+        if alarms:
+            return "|".join(alarms)
 
-    def __post_init__(self, raw_value: str) -> None:
-        self.value = raw_value == "On"
-
-
-@dataclass
-class AlarmReasonMonitorData(MonitorData):
-    value: str = field(init=False)
-    raw_value: InitVar[int]
-
-    def __post_init__(self, raw_value: str) -> None:
-        if not str:
-            self.value = "None"
-
-        int_value = int(raw_value)
-        alarms = []
-        for alarm in AlarmReason:
-            if int_value & alarm:
-                alarms.append(str(alarm))
-
-        self.value = "|".join(alarms) if alarms else "None"
-
-
-@dataclass
-class StringMonitorData(MonitorData):
-    value: str
+    return ""
 
 
 class FieldMetadata:
-    def __init__(self, source_name: str, display_name: str,
-                 data_type: Type[MonitorData],
-                 description: str = None) -> None:
-        self.source_name = source_name
-        self.display_name = display_name
-        self.description = description
-        self.data_type = data_type
+    def __init__(self, name: str, converter: Callable[[str], Any]) -> None:
+        self.name = name
+        self._converter = converter
 
-    def create_instance(self, raw_value: str) -> MonitorData:
-        return self.data_type(self.source_name, self.display_name,
-                              self.description, raw_value)
+    def get_value(self, value: str):
+        if self._converter:
+            return self._converter(value)
+        else:
+            return value
 
 
 DATA_FIELDS = dict()
-DATA_FIELDS["V"] = FieldMetadata(
-    "V", "voltage", IntMonitorData, "Voltage (mV)")
-DATA_FIELDS["I"] = FieldMetadata(
-    "I", "current", IntMonitorData, "Current (mA)")
-DATA_FIELDS["CE"] = FieldMetadata(
-    "CE", "consumed_energy", IntMonitorData, "Consumed energy (mAh)")
-DATA_FIELDS["SOC"] = FieldMetadata(
-    "SOC", "state_of_charge", IntMonitorData, "State of charge (promille)")
-DATA_FIELDS["TTG"] = FieldMetadata(
-    "TTG", "time_to_go", IntMonitorData, "Time to go (min)")
-DATA_FIELDS["Alarm"] = FieldMetadata(
-    "Alarm", "alarm", BoolMonitorData, "Alarm active")
-DATA_FIELDS["Relay"] = FieldMetadata(
-    "Relay", "relay", BoolMonitorData, "Relay active")
-DATA_FIELDS["AR"] = FieldMetadata(
-    "AR", "alarm_reason", AlarmReasonMonitorData, "Alarm reason")
-DATA_FIELDS["BMV"] = FieldMetadata(
-    "BMV", "bmv_model", StringMonitorData, "BMV model")
-DATA_FIELDS["FW"] = FieldMetadata(
-    "FW", "fw_version", StringMonitorData, "BMV firmware version")
-DATA_FIELDS["H1"] = FieldMetadata(
-    "H1", "deepest_discharge", IntMonitorData, "Deepest discharge (mAh)")
-DATA_FIELDS["H2"] = FieldMetadata(
-    "H2", "last_discharge", IntMonitorData, "Last discharge (mAh)")
-DATA_FIELDS["H3"] = FieldMetadata(
-    "H3", "average_discharge", IntMonitorData, "Average discharge (mAh)")
-DATA_FIELDS["H4"] = FieldMetadata(
-    "H4", "num_charge_cycles", IntMonitorData, "Number of charge cycles")
-DATA_FIELDS["H5"] = FieldMetadata(
-    "H5", "num_full_discharges", IntMonitorData, "Number of full discharges")
-DATA_FIELDS["H6"] = FieldMetadata(
-    "H6", "total_consumed", IntMonitorData, "Total consumed energy (mAh)")
-DATA_FIELDS["H7"] = FieldMetadata(
-    "H7", "min_battery_voltage", IntMonitorData, "Minimum battery voltage (mV)")
-DATA_FIELDS["H8"] = FieldMetadata(
-    "H8", "max_battery_voltage", IntMonitorData, "Maximum battery voltage (mV)")
-DATA_FIELDS["H9"] = FieldMetadata(
-    "H9", "days_since_last_full_charge", IntMonitorData, "Number of days since last full charge")
-DATA_FIELDS["H10"] = FieldMetadata(
-    "H10", "num_auto_syncs", IntMonitorData, "Number of automatic synchronizations")
-DATA_FIELDS["H11"] = FieldMetadata(
-    "H11", "num_low_voltage_alarms", IntMonitorData, "Number of low voltage alarms")
-DATA_FIELDS["H12"] = FieldMetadata(
-    "H12", "num_high_voltage_alarms", IntMonitorData, "Number of high voltage alarms")
+DATA_FIELDS["V"] = FieldMetadata("voltage", _as_int)
+DATA_FIELDS["I"] = FieldMetadata("current", _as_int)
+DATA_FIELDS["CE"] = FieldMetadata("consumed_energy", _as_int)
+DATA_FIELDS["SOC"] = FieldMetadata("state_of_charge", _as_int)
+DATA_FIELDS["TTG"] = FieldMetadata("time_to_go", _as_int)
+DATA_FIELDS["Alarm"] = FieldMetadata("alarm", _as_bool)
+DATA_FIELDS["Relay"] = FieldMetadata("relay", _as_bool)
+DATA_FIELDS["AR"] = FieldMetadata("alarm_reason", _as_alarm_str)
+DATA_FIELDS["BMV"] = FieldMetadata("bmv_model", None)
+DATA_FIELDS["FW"] = FieldMetadata("fw_version", None)
+DATA_FIELDS["H1"] = FieldMetadata("deepest_discharge", _as_int)
+DATA_FIELDS["H2"] = FieldMetadata("last_discharge", _as_int)
+DATA_FIELDS["H3"] = FieldMetadata("average_discharge", _as_int)
+DATA_FIELDS["H4"] = FieldMetadata("num_charge_cycles", _as_int)
+DATA_FIELDS["H5"] = FieldMetadata("num_full_discharges", _as_int)
+DATA_FIELDS["H6"] = FieldMetadata("total_consumed", _as_int)
+DATA_FIELDS["H7"] = FieldMetadata("min_battery_voltage", _as_int)
+DATA_FIELDS["H8"] = FieldMetadata("max_battery_voltage", _as_int)
+DATA_FIELDS["H9"] = FieldMetadata("days_since_last_full_charge", _as_int)
+DATA_FIELDS["H10"] = FieldMetadata("num_auto_syncs", _as_int)
+DATA_FIELDS["H11"] = FieldMetadata("num_low_voltage_alarms", _as_int)
+DATA_FIELDS["H12"] = FieldMetadata("num_high_voltage_alarms", _as_int)
 
 
-def _get_field(name: str, value: str) -> MonitorData:
+def _get_field(name: str, value: str) -> tuple:
     field = DATA_FIELDS.get(name)
     if field:
-        return field.create_instance(value)
-    else:
-        return None
+        name = field.name
+        value = field.get_value(value)
+
+    return (name, value)
 
 
 def has_serial_support() -> bool:
@@ -226,14 +172,13 @@ class BlockReader:
     def _parse_line_ex(line: str, block: dict):
         values = line.split('\t')
         if len(values) == 2:
-            field = _get_field(values[0], values[1])
-            if field:
-                block[field.source_name] = field
+            (name, value) = _get_field(values[0], values[1])
+            block[name] = value
 
 
 def _print_block(block: dict):
-    for _, v in block.items():
-        print("{0}: {1}".format(v.display_name, v.value))
+    for k, v in block.items():
+        print("{0}: {1}".format(k, v))
 
 
 def _read_data_file(filePath: str, reader: BlockReader):
