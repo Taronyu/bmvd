@@ -7,6 +7,8 @@ except ModuleNotFoundError:
 import argparse
 from contextlib import contextmanager
 from enum import IntFlag
+from dataclasses import InitVar, dataclass, field
+from typing import Type
 
 
 class AlarmReason(IntFlag):
@@ -15,106 +17,121 @@ class AlarmReason(IntFlag):
     low_state_of_charge = 4
 
 
-class DataField:
-    "This class defines metadata for a BMV data field."
-
-    def __init__(self, name: str, description: str):
-        """Constructs a new class instance.
-
-        Parameters:
-            name: Parameter name
-            description: Optional parameter description
-        """
-        self.name = name
-        self.description = description
+@dataclass
+class MonitorData:
+    source_name: str
+    display_name: str
+    description: str
 
 
-class IntDataField(DataField):
-    "This class provides metadata for an integer field."
+@dataclass
+class IntMonitorData(MonitorData):
+    value: int = field(init=False)
+    raw_value: InitVar[str]
 
-    def convert(self, value: str) -> int:
-        if value:
-            return int(value)
-        else:
-            return 0
-
-
-class BoolDataField(DataField):
-    "This class provides metadata for a boolean field."
-
-    def convert(self, value: str) -> bool:
-        return True if value == "On" else False
+    def __post_init__(self, raw_value: str) -> None:
+        self.value = int(raw_value) if raw_value else 0
 
 
-class StringDataField(DataField):
-    "This class provides metadata for a string field."
+@dataclass
+class BoolMonitorData(MonitorData):
+    value: bool = field(init=False)
+    raw_value: InitVar[str]
 
-    def convert(self, value: str) -> str:
-        return value
+    def __post_init__(self, raw_value: str) -> None:
+        self.value = raw_value == "On"
 
 
-class AlarmReasonDataField(DataField):
-    "This class provides metadata for a alarm reason field."
+@dataclass
+class AlarmReasonMonitorData(MonitorData):
+    value: str = field(init=False)
+    raw_value: InitVar[int]
 
-    def convert(self, value: str) -> str:
-        if not value:
-            return "None"
+    def __post_init__(self, raw_value: str) -> None:
+        if not str:
+            self.value = "None"
 
-        value = int(value)
-        if value == 0:
-            return "None"
-
+        int_value = int(raw_value)
         alarms = []
         for alarm in AlarmReason:
-            if value & alarm:
+            if int_value & alarm:
                 alarms.append(str(alarm))
 
-        return "|".join(alarms)
+        self.value = "|".join(alarms) if alarms else "None"
+
+
+@dataclass
+class StringMonitorData(MonitorData):
+    value: str
+
+
+class FieldMetadata:
+    def __init__(self, source_name: str, display_name: str,
+                 data_type: Type[MonitorData],
+                 description: str = None) -> None:
+        self.source_name = source_name
+        self.display_name = display_name
+        self.description = description
+        self.data_type = data_type
+
+    def create_instance(self, raw_value: str) -> MonitorData:
+        return self.data_type(self.source_name, self.display_name,
+                              self.description, raw_value)
 
 
 DATA_FIELDS = dict()
-DATA_FIELDS["V"] = IntDataField("voltage", "Voltage (mV)")
-DATA_FIELDS["I"] = IntDataField("current", "Current (mA)")
-DATA_FIELDS["CE"] = IntDataField("consumed_energy", "Consumed energy (mAh)")
-DATA_FIELDS["SOC"] = IntDataField(
-    "state_of_charge", "State of charge (promille)")
-DATA_FIELDS["TTG"] = IntDataField("time_to_go", "Time to go (min)")
-DATA_FIELDS["Alarm"] = BoolDataField("alarm", "Alarm active")
-DATA_FIELDS["Relay"] = BoolDataField("relay", "Relay active")
-DATA_FIELDS["AR"] = AlarmReasonDataField("alarm_reason", "Alarm reason")
-DATA_FIELDS["BMV"] = StringDataField("bmv_model", "BMV model")
-DATA_FIELDS["FW"] = StringDataField("fw_version", "BMV firmware version")
-DATA_FIELDS["H1"] = IntDataField(
-    "deepest_discharge", "Deepest discharge (mAh)")
-DATA_FIELDS["H2"] = IntDataField("last_discharge", "Last discharge (mAh)")
-DATA_FIELDS["H3"] = IntDataField(
-    "average_discharge", "Average discharge (mAh)")
-DATA_FIELDS["H4"] = IntDataField(
-    "num_charge_cycles", "Number of charge cycles")
-DATA_FIELDS["H5"] = IntDataField(
-    "num_full_discharges", "Number of full discharges")
-DATA_FIELDS["H6"] = IntDataField(
-    "total_consumed", "Total consumed energy (mAh)")
-DATA_FIELDS["H7"] = IntDataField("min_battery_voltage",
-                                 "Minimum battery voltage (mV)")
-DATA_FIELDS["H8"] = IntDataField("max_battery_voltage",
-                                 "Maximum battery voltage (mV)")
-DATA_FIELDS["H9"] = IntDataField("days_since_last_full_charge",
-                                 "Number of days since last full charge")
-DATA_FIELDS["H10"] = IntDataField("num_auto_syncs",
-                                  "Number of automatic synchronizations")
-DATA_FIELDS["H11"] = IntDataField("num_low_voltage_alarms",
-                                  "Number of low voltage alarms")
-DATA_FIELDS["H12"] = IntDataField("num_high_voltage_alarms",
-                                  "Number of high voltage alarms")
+DATA_FIELDS["V"] = FieldMetadata(
+    "V", "voltage", IntMonitorData, "Voltage (mV)")
+DATA_FIELDS["I"] = FieldMetadata(
+    "I", "current", IntMonitorData, "Current (mA)")
+DATA_FIELDS["CE"] = FieldMetadata(
+    "CE", "consumed_energy", IntMonitorData, "Consumed energy (mAh)")
+DATA_FIELDS["SOC"] = FieldMetadata(
+    "SOC", "state_of_charge", IntMonitorData, "State of charge (promille)")
+DATA_FIELDS["TTG"] = FieldMetadata(
+    "TTG", "time_to_go", IntMonitorData, "Time to go (min)")
+DATA_FIELDS["Alarm"] = FieldMetadata(
+    "Alarm", "alarm", BoolMonitorData, "Alarm active")
+DATA_FIELDS["Relay"] = FieldMetadata(
+    "Relay", "relay", BoolMonitorData, "Relay active")
+DATA_FIELDS["AR"] = FieldMetadata(
+    "AR", "alarm_reason", AlarmReasonMonitorData, "Alarm reason")
+DATA_FIELDS["BMV"] = FieldMetadata(
+    "BMV", "bmv_model", StringMonitorData, "BMV model")
+DATA_FIELDS["FW"] = FieldMetadata(
+    "FW", "fw_version", StringMonitorData, "BMV firmware version")
+DATA_FIELDS["H1"] = FieldMetadata(
+    "H1", "deepest_discharge", IntMonitorData, "Deepest discharge (mAh)")
+DATA_FIELDS["H2"] = FieldMetadata(
+    "H2", "last_discharge", IntMonitorData, "Last discharge (mAh)")
+DATA_FIELDS["H3"] = FieldMetadata(
+    "H3", "average_discharge", IntMonitorData, "Average discharge (mAh)")
+DATA_FIELDS["H4"] = FieldMetadata(
+    "H4", "num_charge_cycles", IntMonitorData, "Number of charge cycles")
+DATA_FIELDS["H5"] = FieldMetadata(
+    "H5", "num_full_discharges", IntMonitorData, "Number of full discharges")
+DATA_FIELDS["H6"] = FieldMetadata(
+    "H6", "total_consumed", IntMonitorData, "Total consumed energy (mAh)")
+DATA_FIELDS["H7"] = FieldMetadata(
+    "H7", "min_battery_voltage", IntMonitorData, "Minimum battery voltage (mV)")
+DATA_FIELDS["H8"] = FieldMetadata(
+    "H8", "max_battery_voltage", IntMonitorData, "Maximum battery voltage (mV)")
+DATA_FIELDS["H9"] = FieldMetadata(
+    "H9", "days_since_last_full_charge", IntMonitorData, "Number of days since last full charge")
+DATA_FIELDS["H10"] = FieldMetadata(
+    "H10", "num_auto_syncs", IntMonitorData, "Number of automatic synchronizations")
+DATA_FIELDS["H11"] = FieldMetadata(
+    "H11", "num_low_voltage_alarms", IntMonitorData, "Number of low voltage alarms")
+DATA_FIELDS["H12"] = FieldMetadata(
+    "H12", "num_high_voltage_alarms", IntMonitorData, "Number of high voltage alarms")
 
 
-def _get_field_value(name: str, value: str) -> tuple:
+def _get_field(name: str, value: str) -> MonitorData:
     field = DATA_FIELDS.get(name)
     if field:
-        return (field.name, field.convert(value))
+        return field.create_instance(value)
     else:
-        return (name, value)
+        return None
 
 
 def has_serial_support() -> bool:
@@ -209,13 +226,14 @@ class BlockReader:
     def _parse_line_ex(line: str, block: dict):
         values = line.split('\t')
         if len(values) == 2:
-            (name, value) = _get_field_value(values[0], values[1])
-            block[name] = value
+            field = _get_field(values[0], values[1])
+            if field:
+                block[field.source_name] = field
 
 
 def _print_block(block: dict):
-    for k, v in block.items():
-        print("{0}: {1}".format(k, v))
+    for _, v in block.items():
+        print("{0}: {1}".format(v.display_name, v.value))
 
 
 def _read_data_file(filePath: str, reader: BlockReader):
