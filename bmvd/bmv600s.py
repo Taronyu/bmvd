@@ -9,8 +9,7 @@ import threading
 from contextlib import contextmanager
 from enum import IntFlag
 from typing import Any, Callable
-
-from serial.serialutil import SerialException
+from collections import deque
 
 
 class AlarmReason(IntFlag):
@@ -204,7 +203,7 @@ class SerialReaderThread(threading.Thread):
         self.stop_event = threading.Event()
         self._device = device
         self._lock = threading.Lock
-        self._blocks = []
+        self._blocks = deque(maxlen=10)
         self._reader = BlockReader()
 
     def stop(self):
@@ -212,7 +211,7 @@ class SerialReaderThread(threading.Thread):
 
     def run(self):
         self._reader.reset()
-        
+
         with open_serial_port(self._device) as sp:
             while True:
                 if self.stop_event.is_set():
@@ -229,15 +228,11 @@ class SerialReaderThread(threading.Thread):
 
         with self._lock:
             self._blocks.append(blocks)
-            # Remove first 20 blocks if not taken yet
-            if len(self._blocks) > 20:
-                del self._blocks[:20]
 
-    def get_blocks(self) -> list():
+    def take_blocks(self, blocks: list) -> None:
         with self._lock:
-            blocks = self._blocks
-            self._blocks = []
-            return blocks
+            while self._blocks:
+                blocks.append(self._blocks.popleft())
 
 
 def main():
