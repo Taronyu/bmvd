@@ -5,9 +5,12 @@ except ModuleNotFoundError:
     _HAS_SERIAL = False
 
 import argparse
+import threading
 from contextlib import contextmanager
 from enum import IntFlag
 from typing import Any, Callable
+
+from serial.serialutil import SerialException
 
 
 class AlarmReason(IntFlag):
@@ -95,15 +98,11 @@ def open_serial_port(device: str):
     Returns:
             (sp, err): Serial port handle and error if opening the port failed
     """
+    sp = serial.Serial(device, 19200, timeout=5, xonxoff=True)
     try:
-        sp = serial.Serial(device, 19200, timeout=5, xonxoff=True)
-    except serial.SerialException as e:
-        yield None, e
-    else:
-        try:
-            yield sp, None
-        finally:
-            sp.close()
+        yield sp
+    finally:
+        sp.close()
 
 
 class BlockReader:
@@ -113,6 +112,10 @@ class BlockReader:
     def __init__(self):
         "Initializes a new class instance."
         self._buffer = bytearray()
+
+    def reset(self):
+        "Clears the current buffer."
+        self._buffer.clear()
 
     def read(self, data: bytes):
         """Reads the given byte buffer into the internal buffer and tries to
@@ -193,14 +196,64 @@ def _read_data_file(filePath: str, reader: BlockReader):
                 break
 
 
+class SerialReaderThread(threading.Thread):
+    def __init__(self, device: str):
+        super().__init__()
+        self.name = "SerialReaderThread"
+        self.daemon = False
+        self.stop_event = threading.Event()
+        self._device = device
+        self._lock = threading.Lock
+        self._blocks = []
+        self._reader = BlockReader()
+
+    def stop(self):
+        self.stop_event.set()
+
+    def run(self):
+        self._reader.reset()
+        
+        with open_serial_port(self._device) as sp:
+            while True:
+                if self.stop_event.is_set():
+                    break
+
+                data = sp.read(64)
+                if data:
+                    self._process_data(data)
+
+    def _process_data(self, data) -> None:
+        blocks = self._reader.read(data)
+        if not blocks:
+            return
+
+        with self._lock:
+            self._blocks.append(blocks)
+            # Remove first 20 blocks if not taken yet
+            if len(self._blocks) > 20:
+                del self._blocks[:20]
+
+    def get_blocks(self) -> list():
+        with self._lock:
+            blocks = self._blocks
+            self._blocks = []
+            return blocks
+
+
 def main():
     ap = argparse.ArgumentParser(
         prog="bmv600s", description="read BMV-600S data files")
+    ap.add_argument("-f", "--file", dest="use_file", action="store_true",
+                    help="open a file instead of a serial port")
     ap.add_argument("filename", type=str, help="path to the data file to read")
     args = ap.parse_args()
 
-    reader = BlockReader()
-    _read_data_file(args.filename, reader)
+    if args.use_file:
+        reader = BlockReader()
+        _read_data_file(args.filename, reader)
+    else:
+        thread = SerialReaderThread(args.filename)
+        thread.start()
 
 
 if __name__ == "__main__":
