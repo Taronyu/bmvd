@@ -2,7 +2,17 @@ import argparse
 import json
 import threading
 import signal
+
+from bmv600s import AlarmReason, MonitorData
 from http.server import BaseHTTPRequestHandler, HTTPServer
+
+
+class MonitorDataJsonEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, MonitorData):
+            return obj.__dict__
+        else:
+            return super.default(obj)
 
 
 class BmvRequestHandler(BaseHTTPRequestHandler):
@@ -27,20 +37,19 @@ class BmvRequestHandler(BaseHTTPRequestHandler):
         self.send_header("Content-type", "application/json")
         self.end_headers()
 
-        dump = json.dumps(BmvRequestHandler._get_blocks())
+        dump = BmvRequestHandler._get_data_json()
         self.wfile.write(dump.encode("utf-8"))
 
     @classmethod
-    def _get_blocks(cls) -> dict():
+    def _get_data_json(cls) -> str:
         if not cls.data_provider:
-            return {}
+            return "{}"
 
-        blocks = cls.data_provider.take_blocks()
-        if len(blocks) >= 2:
-            # First two blocks contain the most recent data
-            return {**blocks[0], **blocks[1]}
+        data = cls.data_provider.copy_current_data()
+        if data:
+            return json.dumps(data.__dict__, cls=MonitorDataJsonEncoder)
         else:
-            return {}
+            return "{}"
 
 
 class WebServerThread(threading.Thread):
@@ -69,17 +78,16 @@ class _DummyDataProvider:
     "Dummy data provider implementation used for testing only."
 
     def __init__(self):
-        data1 = dict()
-        data1["voltage"] = 12000
-        data1["current"] = -2800
+        self._data = MonitorData()
+        self._data.voltage = 12800
+        self._data.current = -2000
+        self._data.alarm = True
+        ar = int(AlarmReason.LOW_VOLTAGE | AlarmReason.HIGH_VOLTAGE)
+        self._data.alarm_reason = MonitorData.value_as_alarm_str(str(ar))
+        self._data.model_name = "dummy_bmv"
+        self._data.firmware_version = "010"
 
-        data2 = dict()
-        data2["deepest_discharge"] = 10000
-        data2["last_discharge"] = 2000
-
-        self._data = [data1, data2]
-
-    def take_blocks(self) -> list:
+    def copy_current_data(self) -> MonitorData:
         return self._data
 
 
