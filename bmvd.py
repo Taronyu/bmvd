@@ -31,10 +31,6 @@ def stop_serial() -> None:
         _serial_reader.stop()
 
 
-def _signal_handler(signum, frame):
-    stop_serial()
-
-
 def main():
     ap = argparse.ArgumentParser(
         prog="bmvd", description="Battery Monitor daemon")
@@ -45,9 +41,10 @@ def main():
                     help="use a datafile instead of reading live data from the battery monitor")
     args = ap.parse_args()
 
-    # Register signal handler
-    signal.signal(signal.SIGTERM, _signal_handler)
-    signal.signal(signal.SIGINT, _signal_handler)
+    # Register signal handlers
+    def sighandler(signum, frame): return stop_serial()
+    signal.signal(signal.SIGTERM, sighandler)
+    signal.signal(signal.SIGINT, sighandler)
 
     if not args.datafile:
         start_serial("", args.web_port)

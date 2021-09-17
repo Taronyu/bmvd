@@ -205,13 +205,15 @@ class SerialReaderThread(threading.Thread):
         self.stop_event = threading.Event()
         self._device = device
         self._lock = threading.Lock
-        self._blocks = deque(maxlen=10)
+        self._blocks = deque(maxlen=4)
         self._reader = BlockReader()
 
     def stop(self):
+        print("Stopping the serial port reader")
         self.stop_event.set()
 
     def run(self):
+        print("Starting the serial port reader")
         self._reader.reset()
 
         try:
@@ -234,10 +236,11 @@ class SerialReaderThread(threading.Thread):
         with self._lock:
             self._blocks.append(blocks)
 
-    def take_blocks(self, blocks: list) -> None:
+    def take_blocks(self) -> list:
         with self._lock:
-            while self._blocks:
-                blocks.append(self._blocks.popleft())
+            blocks = list(self._blocks)
+            self._blocks.clear()
+            return blocks
 
 
 def main():

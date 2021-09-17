@@ -26,9 +26,8 @@ class BmvRequestHandler(BaseHTTPRequestHandler):
 
         dump = None
         if BmvRequestHandler.data_provider:
-            blocks = BmvRequestHandler.take_blocks()
-            if blocks:
-                dump = json.dumps(blocks)
+            blocks = BmvRequestHandler.data_provider.take_blocks()
+            dump = json.dumps(blocks)
 
         if not dump:
             dump = "[]"
@@ -56,13 +55,30 @@ class WebServerThread(threading.Thread):
             self._server.serve_forever()
 
 
+class _DummyDataProvider:
+    def __init__(self):
+        data1 = dict()
+        data1["V"] = 12000
+        data1["I"] = -2800
+
+        data2 = dict()
+        data2["H1"] = 10000
+        data2["H2"] = 8000
+
+        self._data = list((data1, data2))
+
+    def take_blocks(self) -> list:
+        return self._data
+
+
 def main():
     ap = argparse.ArgumentParser(description="Battery monitor http server")
     ap.add_argument("-p", "--port", metavar="PORT", type=int, default=7070,
                     help="server port to listen on")
     args = ap.parse_args()
 
-    server = WebServerThread(args.port, None)
+    provider = _DummyDataProvider()
+    server = WebServerThread(args.port, provider)
     try:
         server.start()
     except KeyboardInterrupt:
