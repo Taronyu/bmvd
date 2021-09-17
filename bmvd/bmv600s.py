@@ -11,6 +11,8 @@ from enum import IntFlag
 from typing import Any, Callable
 from collections import deque
 
+from serial.serialutil import SerialException
+
 
 class AlarmReason(IntFlag):
     low_voltage = 1
@@ -212,14 +214,17 @@ class SerialReaderThread(threading.Thread):
     def run(self):
         self._reader.reset()
 
-        with open_serial_port(self._device) as sp:
-            while True:
-                if self.stop_event.is_set():
-                    break
+        try:
+            with open_serial_port(self._device) as sp:
+                while True:
+                    if self.stop_event.is_set():
+                        break
 
-                data = sp.read(64)
-                if data:
-                    self._process_data(data)
+                    data = sp.read(64)
+                    if data:
+                        self._process_data(data)
+        except SerialException as ex:
+            print("Failed to read serial data: {0}".format(ex))
 
     def _process_data(self, data) -> None:
         blocks = self._reader.read(data)

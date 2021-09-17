@@ -1,14 +1,12 @@
 import argparse
 import json
+import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
-
-data = dict()
-data["V"] = "12800"
-data["I"] = "-1000"
 
 
 class BmvRequestHandler(BaseHTTPRequestHandler):
     server_version = "bmvd/0.1"
+    data_provider = None
 
     def do_GET(self):
         if self.path == "/":
@@ -26,8 +24,36 @@ class BmvRequestHandler(BaseHTTPRequestHandler):
         self.send_header("Content-type", "application/json")
         self.end_headers()
 
-        dump = json.dumps(data)
+        dump = None
+        if BmvRequestHandler.data_provider:
+            blocks = BmvRequestHandler.take_blocks()
+            if blocks:
+                dump = json.dumps(blocks)
+
+        if not dump:
+            dump = "[]"
+
         self.wfile.write(dump.encode("utf-8"))
+
+
+class WebServerThread(threading.Thread):
+    def __init__(self, port: int, data_provider):
+        super().__init__()
+        self.name = "WebserverThread"
+        self.daemon = False
+
+        BmvRequestHandler.data_provider = data_provider
+        self._server = HTTPServer(("", port), BmvRequestHandler, True)
+        self._server.timeout = 2.0
+
+    def stop(self):
+        print("Stopping the webserver")
+        self._server.shutdown()
+
+    def run(self):
+        print("Starting the webserver")
+        with self._server:
+            self._server.serve_forever()
 
 
 def main():
@@ -36,13 +62,12 @@ def main():
                     help="server port to listen on")
     args = ap.parse_args()
 
-    print("Starting HTTP server on port {0}".format(args.port))
-    server = HTTPServer(("", args.port), BmvRequestHandler)
+    server = WebServerThread(args.port, None)
     try:
-        server.serve_forever()
+        server.start()
     except KeyboardInterrupt:
-        print("Server shutting down")
-        pass
+        print("Server is shutting down")
+        server.stop()
 
 
 if __name__ == "__main__":
