@@ -4,52 +4,39 @@ import signal
 from bmvd.bmv600s import SerialReaderThread
 from bmvd.webserver import WebServerThread
 
-_serial_reader: SerialReaderThread = None
-_webserver: WebServerThread = None
 
+class BatteryMonitorDaemon:
+    def __init__(self, serial_device: str, web_port: int):
+        self._serial_reader = SerialReaderThread(serial_device)
+        self._webserver = WebServerThread(web_port, self._serial_reader)
 
-def start_serial(device: str, port: int) -> None:
-    global _serial_reader
-    global _webserver
+    def start(self):
+        self._serial_reader.start()
+        self._webserver.start()
 
-    # Start the serial reader thread
-    _serial_reader = SerialReaderThread(device)
-    _serial_reader.start()
-
-    # Start the webserver thread
-    _webserver = WebServerThread(port, _serial_reader)
-    _webserver.start()
-
-
-def stop_serial() -> None:
-    # Stop the webserver thread
-    if _webserver:
-        _webserver.stop()
-
-    # Stop the serial reader thread
-    if _serial_reader:
-        _serial_reader.stop()
+    def stop(self):
+        self._webserver.stop()
+        self._serial_reader.stop()
 
 
 def main():
     ap = argparse.ArgumentParser(
         prog="bmvd", description="Battery Monitor daemon")
+    ap.add_argument("serial_device", type=str, metavar="DEVICE",
+                    help="serial port device to use")
     ap.add_argument("--port", type=int, metavar="PORT", dest="web_port",
                     help="set the port to listen on for the http server",
                     default=7070)
-    ap.add_argument("--datafile", type=str, metavar="FILE",
-                    help="use a datafile instead of reading live data from the battery monitor")
     args = ap.parse_args()
 
+    daemon = BatteryMonitorDaemon(args.serial_device, args.web_port)
+
     # Register signal handlers
-    def sighandler(signum, frame): return stop_serial()
+    def sighandler(signum, frame): return daemon.stop()
     signal.signal(signal.SIGTERM, sighandler)
     signal.signal(signal.SIGINT, sighandler)
 
-    if not args.datafile:
-        start_serial("", args.web_port)
-    else:
-        pass
+    daemon.start()
 
 
 if __name__ == "__main__":
