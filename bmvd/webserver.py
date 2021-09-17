@@ -47,14 +47,14 @@ class _BmvRequestHandler(BaseHTTPRequestHandler):
     def _get_data_json(cls) -> str:
         "Gets the current monitor data as a JSON string."
 
-        if not cls.data_provider:
-            return "{}"
+        data = None
+        if cls.data_provider:
+            data = cls.data_provider.copy_current_data()
 
-        data = cls.data_provider.copy_current_data()
-        if data:
-            return json.dumps(data.__dict__, cls=MonitorDataJsonEncoder)
-        else:
-            return "{}"
+        if not data:
+            data = MonitorData()
+
+        return json.dumps(data, cls=MonitorDataJsonEncoder)
 
 
 class WebServerThread(threading.Thread):
