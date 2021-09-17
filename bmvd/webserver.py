@@ -6,6 +6,8 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 
 class BmvRequestHandler(BaseHTTPRequestHandler):
+    "BMV request handler implementation."
+
     server_version = "bmvd/0.1"
     data_provider = None
 
@@ -35,12 +37,15 @@ class BmvRequestHandler(BaseHTTPRequestHandler):
 
         blocks = cls.data_provider.take_blocks()
         if len(blocks) >= 2:
+            # First two blocks contain the most recent data
             return {**blocks[0], **blocks[1]}
         else:
             return {}
 
 
 class WebServerThread(threading.Thread):
+    "Web server thread implementation."
+
     def __init__(self, port: int, data_provider):
         super().__init__()
         self.name = "WebserverThread"
@@ -61,6 +66,8 @@ class WebServerThread(threading.Thread):
 
 
 class _DummyDataProvider:
+    "Dummy data provider implementation used for testing only."
+
     def __init__(self):
         data1 = dict()
         data1["voltage"] = 12000
@@ -77,6 +84,8 @@ class _DummyDataProvider:
 
 
 def main():
+    "Entry point for the test application."
+
     ap = argparse.ArgumentParser(description="Battery monitor http server")
     ap.add_argument("-p", "--port", metavar="PORT", type=int, default=7070,
                     help="server port to listen on")
