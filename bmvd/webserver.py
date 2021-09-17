@@ -1,5 +1,6 @@
 import argparse
 import json
+import logging
 import signal
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -61,6 +62,9 @@ class WebServerThread(threading.Thread):
 
     def __init__(self, port: int, data_provider):
         super().__init__()
+
+        logging.debug("Creating web server thread.")
+
         self.name = "WebserverThread"
         self.daemon = False
 
@@ -71,13 +75,15 @@ class WebServerThread(threading.Thread):
     def stop(self):
         "Stops the web server thread."
 
-        print("Stopping the webserver")
+        logging.info("Stopping the webserver")
         self._server.shutdown()
 
     def run(self):
-        print("Starting the webserver")
+        logging.info("Starting the webserver")
         with self._server:
             self._server.serve_forever()
+
+        logging.debug("Web server thread has ended.")
 
 
 class _DummyDataProvider:

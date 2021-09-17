@@ -1,4 +1,5 @@
 import argparse
+import logging
 import signal
 
 from bmvd.bmv600s import SerialReaderThread
@@ -20,6 +21,8 @@ class BatteryMonitorDaemon:
 
 
 def main():
+    logging.basicConfig(level=logging.DEBUG)
+
     ap = argparse.ArgumentParser(
         prog="bmvd", description="Battery Monitor daemon")
     ap.add_argument("serial_device", type=str, metavar="DEVICE",

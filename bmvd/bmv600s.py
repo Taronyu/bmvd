@@ -6,6 +6,7 @@ except ModuleNotFoundError:
 
 import argparse
 import dataclasses
+import logging
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -222,6 +223,8 @@ class SerialReaderThread(threading.Thread):
     def __init__(self, device: str):
         super().__init__()
 
+        logging.debug("Creating serial reader thread.")
+
         if not has_serial_support():
             raise RuntimeError("No serial device support present")
 
@@ -234,27 +237,32 @@ class SerialReaderThread(threading.Thread):
         self._reader = MonitorDataReader()
 
     def stop(self):
-        print("Stopping the serial port reader")
+        logging.info("Stopping the serial port reader.")
         self.stop_event.set()
 
     def run(self):
-        print("Starting the serial port reader")
+        logging.info("Starting the serial port reader.")
         self._reader.reset()
 
         try:
             with open_serial_port(self._device) as sp:
                 while True:
                     if self.stop_event.is_set():
+                        logging.debug("Stop event is set.")
                         break
 
                     data = sp.read(64)
                     if data:
                         self._process_data(data)
         except SerialException as ex:
-            print("Failed to read serial data: {0}".format(ex))
+            logging.fatal("Failed to read serial data: {0}".format(ex))
+
+        logging.debug("Serial reader thread has ended.")
 
     def _process_data(self, data) -> None:
+        logging.debug("Processing %d bytes of data", len(data))
         if self._reader.read(data) > 0:
+            logging.debug("Blocks have been extracted, updating monitor data.")
             with self._lock:
                 self._data = self._reader.get_monitor_data()
 
