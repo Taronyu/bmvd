@@ -75,11 +75,11 @@ class WebServerThread(threading.Thread):
     def stop(self):
         "Stops the web server thread."
 
-        logging.info("Stopping the webserver")
+        logging.info("Stopping the webserver.")
         self._server.shutdown()
 
     def run(self):
-        logging.info("Starting the webserver")
+        logging.info("Starting the webserver.")
         with self._server:
             self._server.serve_forever()
 
