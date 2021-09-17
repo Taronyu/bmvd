@@ -8,6 +8,8 @@ from bmvd.bmv600s import AlarmReason, MonitorData
 
 
 class MonitorDataJsonEncoder(json.JSONEncoder):
+    "JSON Encoder for the monitor data class"
+
     def default(self, obj):
         if isinstance(obj, MonitorData):
             return obj.__dict__
@@ -42,6 +44,8 @@ class _BmvRequestHandler(BaseHTTPRequestHandler):
 
     @classmethod
     def _get_data_json(cls) -> str:
+        "Gets the current monitor data as a JSON string."
+
         if not cls.data_provider:
             return "{}"
 
@@ -65,6 +69,8 @@ class WebServerThread(threading.Thread):
         self._server.timeout = 2.0
 
     def stop(self):
+        "Stops the web server thread."
+
         print("Stopping the webserver")
         self._server.shutdown()
 
