@@ -89,7 +89,7 @@ class _DummyDataProvider:
         self._data.current = -2000
         self._data.alarm = True
         ar = int(AlarmReason.LOW_VOLTAGE | AlarmReason.HIGH_VOLTAGE)
-        self._data.alarm_reason = MonitorData.value_as_alarm_str(str(ar))
+        self._data.alarm_reason = MonitorData.as_alarm_str(str(ar))
         self._data.model_name = "dummy_bmv"
         self._data.firmware_version = "010"
 

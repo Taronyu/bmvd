@@ -47,96 +47,45 @@ class MonitorData:
     num_low_voltage_alarms: int = 0
     num_high_voltage_alarms: int = 0
 
-    def set_value(self, key: str, value: str) -> None:
-        if key == "V":
-            self.voltage = MonitorData.value_as_int(value)
-        elif key == "I":
-            self.current = MonitorData.value_as_int(value)
-        elif key == "CE":
-            self.consumed_energy = MonitorData.value_as_int(value)
-        elif key == "SOC":
-            self.state_of_charge = MonitorData.value_as_int(value)
-        elif key == "TTG":
-            self.time_to_go = MonitorData.value_as_int(value)
-        elif key == "Alarm":
-            self.alarm = MonitorData.value_as_bool(value)
-        elif key == "Relay":
-            self.relay = MonitorData.value_as_bool(value)
-        elif key == "AR":
-            self.alarm_reason = MonitorData.value_as_alarm_str(value)
-        elif key == "BMV":
-            self.model_name = value
-        elif key == "FW":
-            self.firmware_version = value
-        elif key == "H1":
-            self.deepest_discharge = MonitorData.value_as_int(value)
-        elif key == "H2":
-            self.last_discharge = MonitorData.value_as_int(value)
-        elif key == "H3":
-            self.average_discharge = MonitorData.value_as_int(value)
-        elif key == "H4":
-            self.num_charge_cycles = MonitorData.value_as_int(value)
-        elif key == "H5":
-            self.num_full_discharges = MonitorData.value_as_int(value)
-        elif key == "H6":
-            self.total_consumed = MonitorData.value_as_int(value)
-        elif key == "H7":
-            self.min_battery_voltage = MonitorData.value_as_int(value)
-        elif key == "H8":
-            self.max_battery_voltage = MonitorData.value_as_int(value)
-        elif key == "H9":
-            self.days_since_last_full_charge = MonitorData.value_as_int(value)
-        elif key == "H10":
-            self.num_auto_syncs = MonitorData.value_as_int(value)
-        elif key == "H11":
-            self.num_low_voltage_alarms = MonitorData.value_as_int(value)
-        elif key == "H12":
-            self.num_high_voltage_alarms = MonitorData.value_as_int(value)
-        else:
-            raise KeyError("Unsupported field key '{0}'".format(key))
-
     def set_from_dict(self, values: dict) -> None:
         # Current data
-        self.voltage = MonitorData.value_as_int(values.get("V"))
-        self.current = MonitorData.value_as_int(values.get("I"))
-        self.consumed_energy = MonitorData.value_as_int(values.get("CE"))
-        self.state_of_charge = MonitorData.value_as_int(values.get("SOC"))
-        self.time_to_go = MonitorData.value_as_int(values.get("TTG"))
-        self.alarm = MonitorData.value_as_bool(values.get("Alarm"))
-        self.relay = MonitorData.value_as_bool(values.get("Relay"))
-        self.alarm_reason = MonitorData.value_as_alarm_str(values.get("AR"))
+        self.voltage = MonitorData.as_int(values.get("V"))
+        self.current = MonitorData.as_int(values.get("I"))
+        self.consumed_energy = MonitorData.as_int(values.get("CE"))
+        self.state_of_charge = MonitorData.as_int(values.get("SOC"))
+        self.time_to_go = MonitorData.as_int(values.get("TTG"))
+        self.alarm = MonitorData.as_bool(values.get("Alarm"))
+        self.relay = MonitorData.as_bool(values.get("Relay"))
+        self.alarm_reason = MonitorData.as_alarm_str(values.get("AR"))
         self.model_name = values.get("BMV")
         self.firmware_version = values.get("FW")
         # Historical data
-        self.deepest_discharge = MonitorData.value_as_int(values.get("H1"))
-        self.last_discharge = MonitorData.value_as_int(values.get("H2"))
-        self.average_discharge = MonitorData.value_as_int(values.get("H3"))
-        self.num_charge_cycles = MonitorData.value_as_int(values.get("H4"))
-        self.num_full_discharges = MonitorData.value_as_int(values.get("H5"))
-        self.total_consumed = MonitorData.value_as_int(values.get("H6"))
-        self.min_battery_voltage = MonitorData.value_as_int(values.get("H7"))
-        self.max_battery_voltage = MonitorData.value_as_int(values.get("H8"))
-        self.days_since_last_full_charge = MonitorData.value_as_int(
-            values.get("H9"))
-        self.num_auto_syncs = MonitorData.value_as_int(values.get("H10"))
-        self.num_low_voltage_alarms = MonitorData.value_as_int(
-            values.get("H11"))
-        self.num_high_voltage_alarms = MonitorData.value_as_int(
-            values.get("H12"))
+        self.deepest_discharge = MonitorData.as_int(values.get("H1"))
+        self.last_discharge = MonitorData.as_int(values.get("H2"))
+        self.average_discharge = MonitorData.as_int(values.get("H3"))
+        self.num_charge_cycles = MonitorData.as_int(values.get("H4"))
+        self.num_full_discharges = MonitorData.as_int(values.get("H5"))
+        self.total_consumed = MonitorData.as_int(values.get("H6"))
+        self.min_battery_voltage = MonitorData.as_int(values.get("H7"))
+        self.max_battery_voltage = MonitorData.as_int(values.get("H8"))
+        self.days_since_last_full_charge = MonitorData.as_int(values.get("H9"))
+        self.num_auto_syncs = MonitorData.as_int(values.get("H10"))
+        self.num_low_voltage_alarms = MonitorData.as_int(values.get("H11"))
+        self.num_high_voltage_alarms = MonitorData.as_int(values.get("H12"))
 
     def copy(self):
         return dataclasses.replace(self)
 
     @staticmethod
-    def value_as_int(value: str) -> int:
+    def as_int(value: str) -> int:
         return int(value) if value else 0
 
     @staticmethod
-    def value_as_bool(value: str) -> bool:
+    def as_bool(value: str) -> bool:
         return value == "On"
 
     @staticmethod
-    def value_as_alarm_str(value: str) -> str:
+    def as_alarm_str(value: str) -> str:
         if value:
             value = int(value)
             alarms = [alarm.name for alarm in AlarmReason if value & alarm]
@@ -272,6 +221,10 @@ def _read_data_file(filePath: str, reader: MonitorDataReader):
 class SerialReaderThread(threading.Thread):
     def __init__(self, device: str):
         super().__init__()
+
+        if not has_serial_support():
+            raise RuntimeError("No serial device support present")
+
         self.name = "SerialReaderThread"
         self.daemon = False
         self.stop_event = threading.Event()
