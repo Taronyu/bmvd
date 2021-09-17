@@ -106,6 +106,8 @@ class _DummyDataProvider:
 def main():
     "Entry point for the test application."
 
+    logging.basicConfig(level=logging.DEBUG)
+
     ap = argparse.ArgumentParser(description="Battery monitor http server")
     ap.add_argument("-p", "--port", metavar="PORT", type=int, default=7070,
                     help="server port to listen on")

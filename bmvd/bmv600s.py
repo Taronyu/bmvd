@@ -272,6 +272,8 @@ class SerialReaderThread(threading.Thread):
 
 
 def main():
+    logging.basicConfig(level=logging.DEBUG)
+
     ap = argparse.ArgumentParser(
         prog="bmv600s", description="read BMV-600S data files")
     ap.add_argument("-f", "--file", dest="use_file", action="store_true",
