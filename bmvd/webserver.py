@@ -1,10 +1,10 @@
 import argparse
 import json
-import threading
 import signal
-
-from bmv600s import AlarmReason, MonitorData
+import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
+
+from bmvd.bmv600s import AlarmReason, MonitorData
 
 
 class MonitorDataJsonEncoder(json.JSONEncoder):
@@ -15,7 +15,7 @@ class MonitorDataJsonEncoder(json.JSONEncoder):
             return super.default(obj)
 
 
-class BmvRequestHandler(BaseHTTPRequestHandler):
+class _BmvRequestHandler(BaseHTTPRequestHandler):
     "BMV request handler implementation."
 
     server_version = "bmvd/0.1"
@@ -37,7 +37,7 @@ class BmvRequestHandler(BaseHTTPRequestHandler):
         self.send_header("Content-type", "application/json")
         self.end_headers()
 
-        dump = BmvRequestHandler._get_data_json()
+        dump = _BmvRequestHandler._get_data_json()
         self.wfile.write(dump.encode("utf-8"))
 
     @classmethod
@@ -60,8 +60,8 @@ class WebServerThread(threading.Thread):
         self.name = "WebserverThread"
         self.daemon = False
 
-        BmvRequestHandler.data_provider = data_provider
-        self._server = HTTPServer(("", port), BmvRequestHandler, True)
+        _BmvRequestHandler.data_provider = data_provider
+        self._server = HTTPServer(("", port), _BmvRequestHandler, True)
         self._server.timeout = 2.0
 
     def stop(self):

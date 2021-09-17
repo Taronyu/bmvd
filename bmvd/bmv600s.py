@@ -7,10 +7,10 @@ except ModuleNotFoundError:
 import argparse
 import dataclasses
 import threading
-
 from contextlib import contextmanager
-from enum import IntFlag
 from dataclasses import dataclass
+from enum import IntFlag
+
 from serial.serialutil import SerialException
 
 
@@ -95,7 +95,7 @@ class MonitorData:
         else:
             raise KeyError("Unsupported field key '{0}'".format(key))
 
-    def from_dict(self, values: dict) -> None:
+    def set_from_dict(self, values: dict) -> None:
         # Current data
         self.voltage = MonitorData.value_as_int(values.get("V"))
         self.current = MonitorData.value_as_int(values.get("I"))
@@ -123,6 +123,9 @@ class MonitorData:
             values.get("H11"))
         self.num_high_voltage_alarms = MonitorData.value_as_int(
             values.get("H12"))
+
+    def copy(self):
+        return dataclasses.replace(self)
 
     @staticmethod
     def value_as_int(value: str) -> int:
@@ -165,23 +168,25 @@ def open_serial_port(device: str):
         sp.close()
 
 
-class BlockReader:
+class MonitorDataReader:
     "Class to extract blocks from byte buffers."
+
     _CHECKSUM_LABEL = b"Checksum"
 
     def __init__(self):
         "Initializes a new class instance."
         self._buffer = bytearray()
-        self._values = MonitorData()
+        self._values = dict()
 
     def reset(self):
         "Clears the current buffer."
         self._buffer.clear()
-        self._values = MonitorData()
+        self._values.clear()
 
-    @property
-    def monitor_data(self) -> MonitorData:
-        return self._values
+    def get_monitor_data(self) -> MonitorData:
+        data = MonitorData()
+        data.set_from_dict(self._values)
+        return data
 
     def read(self, data: bytes) -> int:
         """Reads the given byte buffer into the internal buffer and tries to
@@ -208,11 +213,11 @@ class BlockReader:
         return counter
 
     def _extract_block(self) -> bool:
-        pos = self._buffer.find(BlockReader._CHECKSUM_LABEL)
+        pos = self._buffer.find(MonitorDataReader._CHECKSUM_LABEL)
         if pos == -1:
             return False
 
-        blocklen = pos + len(BlockReader._CHECKSUM_LABEL) + 2
+        blocklen = pos + len(MonitorDataReader._CHECKSUM_LABEL) + 2
         if len(self._buffer) < blocklen:
             return False
 
@@ -240,12 +245,11 @@ class BlockReader:
         if not line:
             return
 
-        values = line.split('\t')
+        values = line.split('\t', maxsplit=2)
         if len(values) == 2:
-            try:
-                self._values.set_value(values[0], values[1])
-            except KeyError as ex:
-                print("Failed to set value: {0}", ex)
+            self._values[values[0]] = values[1]
+        else:
+            print("Invalid data line: {0}".format(line))
 
 
 def _print_data(data: dict) -> None:
@@ -253,13 +257,14 @@ def _print_data(data: dict) -> None:
         print("{0} = {1}".format(k, v))
 
 
-def _read_data_file(filePath: str, reader: BlockReader):
+def _read_data_file(filePath: str, reader: MonitorDataReader):
     with open(filePath, "rb") as fin:
         while True:
             data = fin.read(64)
             if data:
                 if reader.read(data) > 0:
-                    _print_data(reader.monitor_data.__dict__)
+                    data = reader.get_monitor_data()
+                    _print_data(data.__dict__)
             else:
                 break
 
@@ -271,9 +276,9 @@ class SerialReaderThread(threading.Thread):
         self.daemon = False
         self.stop_event = threading.Event()
         self._device = device
-        self._lock = threading.Lock
+        self._lock = threading.Lock()
         self._data = MonitorData()
-        self._reader = BlockReader()
+        self._reader = MonitorDataReader()
 
     def stop(self):
         print("Stopping the serial port reader")
@@ -298,11 +303,11 @@ class SerialReaderThread(threading.Thread):
     def _process_data(self, data) -> None:
         if self._reader.read(data) > 0:
             with self._lock:
-                self._data = dataclasses.replace(self._reader.monitor_data)
+                self._data = self._reader.get_monitor_data()
 
     def copy_current_data(self) -> MonitorData:
         with self._lock:
-            return dataclasses.replace(self._data)
+            return self._data.copy()
 
 
 def main():
@@ -314,7 +319,7 @@ def main():
     args = ap.parse_args()
 
     if args.use_file:
-        reader = BlockReader()
+        reader = MonitorDataReader()
         _read_data_file(args.filename, reader)
     else:
         thread = SerialReaderThread(args.filename)
