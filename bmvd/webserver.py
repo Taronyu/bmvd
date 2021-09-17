@@ -1,6 +1,7 @@
 import argparse
 import json
 import threading
+import signal
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 
@@ -24,15 +25,19 @@ class BmvRequestHandler(BaseHTTPRequestHandler):
         self.send_header("Content-type", "application/json")
         self.end_headers()
 
-        dump = None
-        if BmvRequestHandler.data_provider:
-            blocks = BmvRequestHandler.data_provider.take_blocks()
-            dump = json.dumps(blocks)
-
-        if not dump:
-            dump = "[]"
-
+        dump = json.dumps(BmvRequestHandler._get_blocks())
         self.wfile.write(dump.encode("utf-8"))
+
+    @classmethod
+    def _get_blocks(cls) -> dict():
+        if not cls.data_provider:
+            return {}
+
+        blocks = cls.data_provider.take_blocks()
+        if len(blocks) >= 2:
+            return {**blocks[0], **blocks[1]}
+        else:
+            return {}
 
 
 class WebServerThread(threading.Thread):
@@ -58,14 +63,14 @@ class WebServerThread(threading.Thread):
 class _DummyDataProvider:
     def __init__(self):
         data1 = dict()
-        data1["V"] = 12000
-        data1["I"] = -2800
+        data1["voltage"] = 12000
+        data1["current"] = -2800
 
         data2 = dict()
-        data2["H1"] = 10000
-        data2["H2"] = 8000
+        data2["deepest_discharge"] = 10000
+        data2["last_discharge"] = 2000
 
-        self._data = list((data1, data2))
+        self._data = [data1, data2]
 
     def take_blocks(self) -> list:
         return self._data
@@ -79,11 +84,12 @@ def main():
 
     provider = _DummyDataProvider()
     server = WebServerThread(args.port, provider)
-    try:
-        server.start()
-    except KeyboardInterrupt:
-        print("Server is shutting down")
-        server.stop()
+
+    def sighandler(signum, frame): return server.stop()
+    signal.signal(signal.SIGINT, sighandler)
+    signal.signal(signal.SIGTERM, sighandler)
+
+    server.start()
 
 
 if __name__ == "__main__":
