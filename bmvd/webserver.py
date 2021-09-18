@@ -6,7 +6,7 @@ import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from bmvd.bmv600s import AlarmReason, MonitorData
-
+from bmvd import __version__
 
 class MonitorDataJsonEncoder(json.JSONEncoder):
     "JSON Encoder for the monitor data class"
@@ -21,7 +21,7 @@ class MonitorDataJsonEncoder(json.JSONEncoder):
 class _BmvRequestHandler(BaseHTTPRequestHandler):
     "BMV request handler implementation."
 
-    server_version = "bmvd/0.1"
+    server_version = f"bmvd/{__version__}"
     data_provider = None
 
     def do_GET(self):
