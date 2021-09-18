@@ -21,8 +21,6 @@ class BatteryMonitorDaemon:
 
 
 def main():
-    logging.basicConfig(level=logging.DEBUG)
-
     ap = argparse.ArgumentParser(
         prog="bmvd", description="Battery Monitor daemon")
     ap.add_argument("serial_device", type=str, metavar="DEVICE",
@@ -30,7 +28,14 @@ def main():
     ap.add_argument("--port", type=int, metavar="PORT", dest="web_port",
                     help="set the port to listen on for the http server",
                     default=7070)
+    ap.add_argument("--logfile", type=str, metavar="FILE", dest="logfile",
+                    help="set the path to a logfile. If not set, log output will be sent to stdout")
     args = ap.parse_args()
+
+    if args.logfile:
+        logging.basicConfig(filename=args.logfile, level=logging.DEBUG)
+    else:
+        logging.basicConfig(level=logging.DEBUG)
 
     daemon = BatteryMonitorDaemon(args.serial_device, args.web_port)
 
