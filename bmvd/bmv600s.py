@@ -1,5 +1,6 @@
 try:
     import serial
+    from serial.serialutil import SerialException
     _HAS_SERIAL = True
 except ModuleNotFoundError:
     _HAS_SERIAL = False
@@ -11,8 +12,6 @@ import threading
 from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import IntFlag
-
-from serial.serialutil import SerialException
 
 
 class AlarmReason(IntFlag):
